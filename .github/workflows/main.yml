@@ -104,5 +104,8 @@ jobs:
       - name: Verify downloaded Terraform plan (After)
         run: ls -al
 
+      - name: Copy Terraform plan to current directory
+        run: cp $GITHUB_WORKSPACE/tfplan .
+
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
