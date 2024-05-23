@@ -104,22 +104,5 @@ jobs:
       - name: Verify downloaded Terraform plan (After)
         run: ls -al
 
-      - name: Send notification to reviewers
-        run: echo "Please approve the Terraform deployment in the Actions tab."
-
-      - name: Wait for approval
-        run: |
-          echo "Pausing for manual approval"
-          pending_approval=true
-          while $pending_approval; do
-            echo "Checking for approval..."
-            sleep 60
-            # Simulate checking for approval by reading an external signal, e.g., from a file or database
-            # Replace the following line with your actual approval mechanism
-            if [ -f /path/to/approval_signal ]; then
-              pending_approval=false
-            fi
-          done
-
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
