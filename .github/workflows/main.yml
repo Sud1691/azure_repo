@@ -59,6 +59,9 @@ jobs:
       - name: Validate Terraform
         run: terraform validate
 
+      - name: Delete existing Terraform plan
+        run: rm -f tfplan
+
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=${{ inputs.environment }}.tfvars
 
@@ -73,6 +76,7 @@ jobs:
         with:
           name: tfplan
           path: tfplan
+
 
   terraform_apply:
     runs-on: ubuntu-latest
