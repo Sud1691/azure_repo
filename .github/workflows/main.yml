@@ -60,17 +60,10 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        id: plan
         run: terraform plan -out=tfplan -var-file=${{ inputs.environment }}.tfvars
 
-      - name: List all Files
-        run: ls -al
-
-      - name: Upload plan file
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan
-          path: tfplan
+      - name: Save Terraform plan to workspace
+        run: mv tfplan $GITHUB_WORKSPACE/tfplan
 
   terraform_apply:
     runs-on: ubuntu-latest
@@ -82,11 +75,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Download plan file
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan
-          path: tfplan
+      - name: Retrieve Terraform plan from workspace
+        run: cp $GITHUB_WORKSPACE/tfplan .
 
       - name: Send notification to reviewers
         run: echo "Please approve the Terraform deployment in the Actions tab."
