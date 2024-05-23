@@ -34,6 +34,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.7.5  # Use the latest stable version
+
       - name: Debug environment input
         run: echo "This is deploying in ${{ inputs.environment }}"
 
@@ -82,6 +87,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.7.5  # Use the latest stable version
 
       - name: Verify downloaded Terraform plan (Before)
         run: ls -al
