@@ -63,7 +63,10 @@ jobs:
         run: terraform plan -out=tfplan -var-file=${{ inputs.environment }}.tfvars
 
       - name: Save Terraform plan to workspace
-        run: mv tfplan $GITHUB_WORKSPACE/tfplan
+        run: |
+          ls -al
+          mv tfplan $GITHUB_WORKSPACE/tfplan
+          ls -al $GITHUB_WORKSPACE
 
   terraform_apply:
     runs-on: ubuntu-latest
@@ -76,7 +79,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Retrieve Terraform plan from workspace
-        run: cp $GITHUB_WORKSPACE/tfplan .
+        run: |
+          ls -al $GITHUB_WORKSPACE
+          cp $GITHUB_WORKSPACE/tfplan .
 
       - name: Send notification to reviewers
         run: echo "Please approve the Terraform deployment in the Actions tab."
