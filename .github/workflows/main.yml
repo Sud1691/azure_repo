@@ -40,7 +40,7 @@ jobs:
           terraform_version: 1.7.5  # Use the latest stable version
 
       - name: Debug environment input
-        run: echo " This is deploying in ${{ inputs.environment }}"
+        run: echo "This is deploying in ${{ inputs.environment }}"
 
       - name: Determine Backend Config
         id: backend-config
@@ -83,7 +83,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: tfplan
-          path: .
+          path: ./tfplan
 
       - name: Send notification to reviewers
         run: echo "Please approve the Terraform deployment in the Actions tab."
@@ -103,4 +103,4 @@ jobs:
           done
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve ./tfplan
