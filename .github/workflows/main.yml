@@ -34,11 +34,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.7.5  # Use the latest stable version
-
       - name: Debug environment input
         run: echo "This is deploying in ${{ inputs.environment }}"
 
@@ -62,26 +57,42 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=${{ inputs.environment }}.tfvars
 
-      - name: Save Terraform plan to workspace
+      - name: Save Terraform plan as artifact
         run: |
           ls -al
           mv tfplan $GITHUB_WORKSPACE/tfplan
-          ls -al $GITHUB_WORKSPACE
+          ls -al
+
+      - name: Upload Terraform plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan
 
   terraform_apply:
     runs-on: ubuntu-latest
     needs: terraform_plan
     environment: production  # Environment with required reviewers
     if: github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: ./stacks/${{ inputs.stacks_name }}/examples/
+        shell: bash
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Retrieve Terraform plan from workspace
-        run: |
-          ls -al $GITHUB_WORKSPACE
-          cp $GITHUB_WORKSPACE/tfplan .
+      - name: Verify downloaded Terraform plan (Before)
+        run: ls -al
+
+      - name: Retrieve Terraform plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+
+      - name: Verify downloaded Terraform plan (After)
+        run: ls -al
 
       - name: Send notification to reviewers
         run: echo "Please approve the Terraform deployment in the Actions tab."
