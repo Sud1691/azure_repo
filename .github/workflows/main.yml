@@ -65,8 +65,6 @@ jobs:
       - name: Save Terraform plan as artifact
         run: |
           ls -al
-          mv tfplan $GITHUB_WORKSPACE/tfplan
-          ls -al
 
       - name: Upload Terraform plan artifact
         uses: actions/upload-artifact@v4
@@ -108,12 +106,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tfplan
+          path: tfplan
 
       - name: Verify downloaded Terraform plan (After)
         run: ls -al
-
-      - name: Copy Terraform plan to current directory
-        run: cp $GITHUB_WORKSPACE/tfplan .
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
