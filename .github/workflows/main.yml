@@ -112,6 +112,7 @@ jobs:
 
       - name: Verify downloaded Terraform plan (After)
         run: ls -al
-
+      - name: Initialize Terraform
+        run: terraform init -reconfigure -backend-config="./config/${{ inputs.environment }}.config" -backend-config="./config/${{ env.config_file }}.config"
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
