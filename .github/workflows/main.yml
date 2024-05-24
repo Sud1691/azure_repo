@@ -112,7 +112,21 @@ jobs:
 
       - name: Verify downloaded Terraform plan (After)
         run: ls -al
+
+
+      - name: Determine Backend Config
+        id: backend-config
+        run: |
+          if [ "${{ github.event.inputs.environment }}" != "prod" ]; then
+            echo "config_file=app.nonprod" >> $GITHUB_ENV
+            echo "This is non prod"
+          else
+            echo "config_file=prod" >> $GITHUB_ENV
+            echo "This is Prod"
+          fi
+
       - name: Initialize Terraform
         run: terraform init -reconfigure -backend-config="./config/${{ inputs.environment }}.config" -backend-config="./config/${{ env.config_file }}.config"
+
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
