@@ -59,9 +59,6 @@ jobs:
       - name: Validate Terraform
         run: terraform validate
 
-      - name: Delete existing Terraform plan
-        run: rm -f tfplan
-
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=${{ inputs.environment }}.tfvars
 
@@ -76,7 +73,6 @@ jobs:
         with:
           name: tfplan
           path: tfplan
-
 
   terraform_apply:
     runs-on: ubuntu-latest
@@ -94,8 +90,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -103,7 +97,9 @@ jobs:
           terraform_version: 1.7.5  # Use the latest stable version
 
       - name: Verify downloaded Terraform plan (Before)
-        run: ls -al
+        run: |
+          ls -al
+          echo $GITHUB_WORKSPACE
 
       - name: Retrieve Terraform plan artifact
         uses: actions/download-artifact@v4
