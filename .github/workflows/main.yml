@@ -109,6 +109,9 @@ jobs:
           name: tfplan
           path: tfplan
 
+      - name: Copy tfplan into current directory
+        run: mv $GITHUB_WORKSPACE/tfplan .
+
       - name: Verify downloaded Terraform plan (After)
         run: ls -al
 
