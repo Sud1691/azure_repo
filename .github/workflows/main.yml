@@ -52,7 +52,6 @@ jobs:
             echo "config_file=prod" >> $GITHUB_ENV
             echo "This is Prod"
           fi
-
       - name: Initialize Terraform
         run: terraform init -reconfigure -backend-config="./config/${{ inputs.environment }}.config" -backend-config="./config/${{ env.config_file }}.config"
 
@@ -63,13 +62,14 @@ jobs:
         run: terraform plan -out=tfplan -var-file=${{ inputs.environment }}.tfvars
 
       - name: Save Terraform plan as artifact
-        run: mv tfplan $GITHUB_WORKSPACE/tfplan
-
+        run: |
+          ls -al
+          mv tfplan $GITHUB_WORKSPACE/tfplan
       - name: Upload Terraform plan artifact
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
-          path: $GITHUB_WORKSPACE/tfplan
+          path: tfplan
 
   terraform_apply:
     runs-on: ubuntu-latest
@@ -100,14 +100,14 @@ jobs:
         run: |
           ls -al
           pwd
-
       - name: Retrieve Terraform plan artifact
         uses: actions/download-artifact@v4
         with:
           name: tfplan
+          path: tfplan
 
-      - name: Move Terraform plan to the current directory
-        run: mv tfplan/tfplan .
+      - name: Copy tfplan into current directory
+        run: mv $GITHUB_WORKSPACE/tfplan/tfplan .
 
       - name: Verify downloaded Terraform plan (After)
         run: ls -al
