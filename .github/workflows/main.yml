@@ -63,15 +63,13 @@ jobs:
         run: terraform plan -out=tfplan -var-file=${{ inputs.environment }}.tfvars
 
       - name: Save Terraform plan as artifact
-        run: |
-          ls -al
-          mv tfplan $GITHUB_WORKSPACE/tfplan
+        run: mv tfplan $GITHUB_WORKSPACE/tfplan
 
       - name: Upload Terraform plan artifact
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
-          path: tfplan
+          path: $GITHUB_WORKSPACE/tfplan
 
   terraform_apply:
     runs-on: ubuntu-latest
@@ -107,10 +105,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tfplan
-          path: tfplan
 
-      - name: Copy tfplan into current directory
-        run: mv $GITHUB_WORKSPACE/tfplan .
+      - name: Move Terraform plan to the current directory
+        run: mv tfplan/tfplan .
 
       - name: Verify downloaded Terraform plan (After)
         run: ls -al
