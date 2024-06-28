@@ -27,7 +27,7 @@ jobs:
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
     defaults:
       run:
-        working-directory: ./stacks/${{ inputs.stacks_name }}/examples/
+        working-directory: ./stacks/${{ inputs.stacks_name }}
         shell: bash
 
     steps:
