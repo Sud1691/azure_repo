@@ -1,0 +1,70 @@
+resource "null_resource" "wait_for_eni_cleanup" {
+  count = var.wait_for_eni_cleanup && var.vpc_config != null ? 1 : 0
+
+  triggers = {
+    canary_name = aws_synthetics_canary.this.name
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${path.module}/wait_for_eni_cleanup.sh ${aws_synthetics_canary.this.name}"
+  }
+
+  depends_on = [aws_synthetics_canary.this]
+}
+
+
+
+#!/bin/bash
+
+set -e
+
+CANARY_NAME="$1"
+REGION="${AWS_REGION:-us-east-1}"
+CONFIRM=${2:-false}
+
+echo "🔍 Looking for ENIs associated with canary '$CANARY_NAME' in region '$REGION'..."
+
+# Find ENIs matching canary name in description
+ENI_IDS=$(aws ec2 describe-network-interfaces \
+  --filters "Name=description,Values=*${CANARY_NAME}*" \
+  --region "$REGION" \
+  --query 'NetworkInterfaces[*].NetworkInterfaceId' \
+  --output text)
+
+if [[ -z "$ENI_IDS" ]]; then
+  echo "✅ No ENIs found. Exiting."
+  exit 0
+fi
+
+echo "🔎 Found ENIs: $ENI_IDS"
+
+if [[ "$CONFIRM" == "true" ]]; then
+  echo "⚠️  Proceed to wait for deletion of the above ENIs? (y/n)"
+  read -r USER_CONFIRM
+  if [[ "$USER_CONFIRM" != "y" ]]; then
+    echo "❌ Cancelled by user."
+    exit 1
+  fi
+fi
+
+echo "⏳ Waiting for ENIs to be deleted..."
+
+for i in {1..30}; do
+  ENI_COUNT=$(aws ec2 describe-network-interfaces \
+      --filters "Name=description,Values=*${CANARY_NAME}*" \
+      --region "$REGION" \
+      --query 'NetworkInterfaces[*].NetworkInterfaceId' \
+      --output text | wc -w)
+
+  if [[ "$ENI_COUNT" -eq 0 ]]; then
+    echo "✅ All ENIs deleted."
+    exit 0
+  else
+    echo "⏳ $ENI_COUNT ENIs still present. Sleeping for 20s..."
+    sleep 20
+  fi
+done
+
+echo "❌ Timeout waiting for ENIs to be deleted."
+exit 1
