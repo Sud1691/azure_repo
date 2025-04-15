@@ -14,133 +14,44 @@ resource "null_resource" "wait_for_eni_cleanup" {
 }
 
 
-
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-CANARY_NAME="$1"
-REGION="${AWS_REGION:-us-east-1}"
-CONFIRM=${2:-false}
+SG_ID="$1"
+REGION=$(aws configure get region || echo "us-east-1")
 
-echo "🔍 Looking for ENIs associated with canary '$CANARY_NAME' in region '$REGION'..."
+echo "Looking for ENIs with Security Group ID: $SG_ID in $REGION"
 
-# Find ENIs matching canary name in description
-ENI_IDS=$(aws ec2 describe-network-interfaces \
-  --filters "Name=description,Values=*${CANARY_NAME}*" \
-  --region "$REGION" \
-  --query 'NetworkInterfaces[*].NetworkInterfaceId' \
-  --output text)
+MAX_ATTEMPTS=120
+SLEEP_INTERVAL=10
 
-if [[ -z "$ENI_IDS" ]]; then
-  echo "✅ No ENIs found. Exiting."
-  exit 0
-fi
+for ((i=1; i<=MAX_ATTEMPTS; i++)); do
+  ENI_IDS=$(aws ec2 describe-network-interfaces \
+    --region "$REGION" \
+    --filters Name=group-id,Values="$SG_ID" \
+    --query "NetworkInterfaces[?Status!='available'].NetworkInterfaceId" \
+    --output text)
 
-echo "🔎 Found ENIs: $ENI_IDS"
-
-if [[ "$CONFIRM" == "true" ]]; then
-  echo "⚠️  Proceed to wait for deletion of the above ENIs? (y/n)"
-  read -r USER_CONFIRM
-  if [[ "$USER_CONFIRM" != "y" ]]; then
-    echo "❌ Cancelled by user."
-    exit 1
-  fi
-fi
-
-echo "⏳ Waiting for ENIs to be deleted..."
-
-for i in {1..30}; do
-  ENI_COUNT=$(aws ec2 describe-network-interfaces \
-      --filters "Name=description,Values=*${CANARY_NAME}*" \
-      --region "$REGION" \
-      --query 'NetworkInterfaces[*].NetworkInterfaceId' \
-      --output text | wc -w)
-
-  if [[ "$ENI_COUNT" -eq 0 ]]; then
-    echo "✅ All ENIs deleted."
-    exit 0
+  if [[ -z "$ENI_IDS" ]]; then
+    echo "$(date '+%T') ✅ All ENIs are in 'available' state or already deleted."
+    break
   else
-    echo "⏳ $ENI_COUNT ENIs still present. Sleeping for 20s..."
-    sleep 20
+    echo "$(date '+%T') ⏳ Attempt $i/$MAX_ATTEMPTS: Waiting for ENIs to be available. Still in-use: $ENI_IDS"
+    sleep "$SLEEP_INTERVAL"
   fi
 done
 
-echo "❌ Timeout waiting for ENIs to be deleted."
-exit 1
-
-
-
-
-=============
-
-
-#!/bin/bash
-
-# Configuration
-SECURITY_GROUP_NAME="$1"  # The security group name to filter ENIs
-REGION="${AWS_REGION:-us-east-1}"  # Default to us-east-1 if not specified
-CONFIRM=${2:-false}  # Whether to auto-confirm or prompt the user
-
-# Check if Security Group Name is provided
-if [ -z "$SECURITY_GROUP_NAME" ]; then
-  echo "❌ Error: Security Group Name is required!"
-  exit 1
-fi
-
-# 1. Get the Security Group ID from the given Security Group Name
-SG_ID=$(aws ec2 describe-security-groups \
-  --filters "Name=group-name,Values=$SECURITY_GROUP_NAME" \
+# Now delete available ENIs associated with the SG
+AVAILABLE_ENIS=$(aws ec2 describe-network-interfaces \
   --region "$REGION" \
-  --query 'SecurityGroups[0].GroupId' \
+  --filters Name=group-id,Values="$SG_ID" Name=status,Values=available \
+  --query "NetworkInterfaces[].NetworkInterfaceId" \
   --output text)
 
-# Check if the Security Group exists
-if [ "$SG_ID" == "None" ]; then
-  echo "❌ Error: Security Group '$SECURITY_GROUP_NAME' not found in region '$REGION'."
-  exit 1
-fi
-
-echo "✅ Found Security Group ID: $SG_ID"
-
-# 2. List ENIs associated with the given Security Group
-echo "🔍 Looking for ENIs associated with Security Group '$SECURITY_GROUP_NAME' (ID: $SG_ID) in region '$REGION'..."
-
-ENI_IDS=$(aws ec2 describe-network-interfaces \
-  --filters "Name=group-id,Values=$SG_ID" \
-  --region "$REGION" \
-  --query 'NetworkInterfaces[*].NetworkInterfaceId' \
-  --output text)
-
-# Check if ENIs are found
-if [[ -z "$ENI_IDS" ]]; then
-  echo "✅ No ENIs found associated with the given security group. Exiting."
-  exit 0
-fi
-
-echo "🔎 Found the following ENIs: $ENI_IDS"
-
-# 3. Ask for user input before deletion (if CONFIRM is not set to true)
-if [[ "$CONFIRM" != "true" ]]; then
-  echo "⚠️ Do you want to delete these ENIs? (y/n)"
-  read -r USER_CONFIRM
-  if [[ "$USER_CONFIRM" != "y" ]]; then
-    echo "❌ Operation cancelled by the user."
-    exit 1
-  fi
-fi
-
-# 4. Delete the ENIs
-for ENI_ID in $ENI_IDS; do
-  echo "⛔ Deleting ENI: $ENI_ID..."
-  aws ec2 delete-network-interface --network-interface-id "$ENI_ID" --region "$REGION"
-
-  # Check if deletion was successful
-  if [ $? -eq 0 ]; then
-    echo "✅ Successfully deleted ENI: $ENI_ID"
-  else
-    echo "❌ Failed to delete ENI: $ENI_ID"
-  fi
+for eni in $AVAILABLE_ENIS; do
+  echo "$(date '+%T') 🔥 Deleting ENI: $eni"
+  aws ec2 delete-network-interface --network-interface-id "$eni" --region "$REGION"
 done
 
-echo "All selected ENIs have been processed."
+echo "✅ Done: All ENIs deleted or in available state."
