@@ -68,3 +68,79 @@ done
 
 echo "❌ Timeout waiting for ENIs to be deleted."
 exit 1
+
+
+
+
+=============
+
+
+#!/bin/bash
+
+# Configuration
+SECURITY_GROUP_NAME="$1"  # The security group name to filter ENIs
+REGION="${AWS_REGION:-us-east-1}"  # Default to us-east-1 if not specified
+CONFIRM=${2:-false}  # Whether to auto-confirm or prompt the user
+
+# Check if Security Group Name is provided
+if [ -z "$SECURITY_GROUP_NAME" ]; then
+  echo "❌ Error: Security Group Name is required!"
+  exit 1
+fi
+
+# 1. Get the Security Group ID from the given Security Group Name
+SG_ID=$(aws ec2 describe-security-groups \
+  --filters "Name=group-name,Values=$SECURITY_GROUP_NAME" \
+  --region "$REGION" \
+  --query 'SecurityGroups[0].GroupId' \
+  --output text)
+
+# Check if the Security Group exists
+if [ "$SG_ID" == "None" ]; then
+  echo "❌ Error: Security Group '$SECURITY_GROUP_NAME' not found in region '$REGION'."
+  exit 1
+fi
+
+echo "✅ Found Security Group ID: $SG_ID"
+
+# 2. List ENIs associated with the given Security Group
+echo "🔍 Looking for ENIs associated with Security Group '$SECURITY_GROUP_NAME' (ID: $SG_ID) in region '$REGION'..."
+
+ENI_IDS=$(aws ec2 describe-network-interfaces \
+  --filters "Name=group-id,Values=$SG_ID" \
+  --region "$REGION" \
+  --query 'NetworkInterfaces[*].NetworkInterfaceId' \
+  --output text)
+
+# Check if ENIs are found
+if [[ -z "$ENI_IDS" ]]; then
+  echo "✅ No ENIs found associated with the given security group. Exiting."
+  exit 0
+fi
+
+echo "🔎 Found the following ENIs: $ENI_IDS"
+
+# 3. Ask for user input before deletion (if CONFIRM is not set to true)
+if [[ "$CONFIRM" != "true" ]]; then
+  echo "⚠️ Do you want to delete these ENIs? (y/n)"
+  read -r USER_CONFIRM
+  if [[ "$USER_CONFIRM" != "y" ]]; then
+    echo "❌ Operation cancelled by the user."
+    exit 1
+  fi
+fi
+
+# 4. Delete the ENIs
+for ENI_ID in $ENI_IDS; do
+  echo "⛔ Deleting ENI: $ENI_ID..."
+  aws ec2 delete-network-interface --network-interface-id "$ENI_ID" --region "$REGION"
+
+  # Check if deletion was successful
+  if [ $? -eq 0 ]; then
+    echo "✅ Successfully deleted ENI: $ENI_ID"
+  else
+    echo "❌ Failed to delete ENI: $ENI_ID"
+  fi
+done
+
+echo "All selected ENIs have been processed."
