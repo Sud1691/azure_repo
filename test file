@@ -55,3 +55,97 @@ for eni in $AVAILABLE_ENIS; do
 done
 
 echo "✅ Done: All ENIs deleted or in available state."
+
+
+====================
+
+
+#!/bin/bash
+
+# ==========================================
+# ENI Cleanup Script for AWS Security Group
+# ==========================================
+
+# Usage:
+#   ./eni_cleanup.sh <security_group_name>
+#   Example:
+#     ./eni_cleanup.sh my-sg-name
+
+# ------------------------------------------
+# Config
+SECURITY_GROUP_NAME="$1"                 # Security group name to filter ENIs
+REGION="${AWS_REGION:-us-east-1}"        # AWS region (default to us-east-1)
+
+# ------------------------------------------
+# Validate inputs
+if [ -z "$SECURITY_GROUP_NAME" ]; then
+  echo "❌ Error: Security Group Name is required!"
+  exit 1
+fi
+
+# ------------------------------------------
+# 1. Get Security Group ID
+SG_ID=$(aws ec2 describe-security-groups \
+  --filters "Name=group-name,Values=$SECURITY_GROUP_NAME" \
+  --region "$REGION" \
+  --query 'SecurityGroups[0].GroupId' \
+  --output text)
+
+if [ "$SG_ID" == "None" ] || [ -z "$SG_ID" ]; then
+  echo "❌ Error: Security Group '$SECURITY_GROUP_NAME' not found in region '$REGION'."
+  exit 1
+fi
+
+echo "✅ Found Security Group ID: $SG_ID"
+
+# ------------------------------------------
+# 2. List associated ENIs
+ENI_IDS=$(aws ec2 describe-network-interfaces \
+  --filters "Name=group-id,Values=$SG_ID" \
+  --region "$REGION" \
+  --query 'NetworkInterfaces[*].NetworkInterfaceId' \
+  --output text)
+
+if [[ -z "$ENI_IDS" ]]; then
+  echo "✅ No ENIs found associated with the given security group. Exiting."
+  exit 0
+fi
+
+echo "🔎 Found the following ENIs:"
+echo "$ENI_IDS"
+
+# ------------------------------------------
+# 3. Delete ENIs
+for ENI_ID in $ENI_IDS; do
+  echo "⛔ Deleting ENI: $ENI_ID..."
+  aws ec2 delete-network-interface --network-interface-id "$ENI_ID" --region "$REGION"
+
+  if [ $? -eq 0 ]; then
+    echo "✅ Successfully triggered delete for ENI: $ENI_ID"
+  else
+    echo "❌ Failed to delete ENI: $ENI_ID (maybe it's still attached)"
+  fi
+done
+
+# ------------------------------------------
+# 4. Wait for ENIs to fully disappear
+echo "⏳ Waiting for ENIs to be completely deleted..."
+for i in {1..30}; do
+  REMAINING_ENIS=$(aws ec2 describe-network-interfaces \
+    --filters "Name=group-id,Values=$SG_ID" \
+    --region "$REGION" \
+    --query 'NetworkInterfaces[*].NetworkInterfaceId' \
+    --output text)
+
+  if [[ -z "$REMAINING_ENIS" ]]; then
+    echo "✅ All ENIs deleted successfully."
+    exit 0
+  else
+    echo "⏱️  ENIs still present: $REMAINING_ENIS. Sleeping for 10s..."
+    sleep 10
+  fi
+done
+
+echo "❌ Timeout waiting for ENIs to be deleted."
+exit 1
+
