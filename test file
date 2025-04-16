@@ -59,7 +59,6 @@ echo "✅ Done: All ENIs deleted or in available state."
 
 ====================
 
-
 #!/bin/bash
 
 # ==========================================
@@ -115,7 +114,16 @@ echo "🔎 Found the following ENIs:"
 echo "$ENI_IDS"
 
 # ------------------------------------------
-# 3. Delete ENIs
+# 3. Ask user for confirmation before deletion
+echo ""
+read -p "⚠️ Do you want to delete these ENIs? (y/n): " CONFIRM
+if [[ "$CONFIRM" != "y" ]]; then
+  echo "❌ Operation cancelled by the user."
+  exit 1
+fi
+
+# ------------------------------------------
+# 4. Delete ENIs
 for ENI_ID in $ENI_IDS; do
   echo "⛔ Deleting ENI: $ENI_ID..."
   aws ec2 delete-network-interface --network-interface-id "$ENI_ID" --region "$REGION"
@@ -128,7 +136,7 @@ for ENI_ID in $ENI_IDS; do
 done
 
 # ------------------------------------------
-# 4. Wait for ENIs to fully disappear
+# 5. Wait for ENIs to fully disappear
 echo "⏳ Waiting for ENIs to be completely deleted..."
 for i in {1..30}; do
   REMAINING_ENIS=$(aws ec2 describe-network-interfaces \
@@ -148,4 +156,3 @@ done
 
 echo "❌ Timeout waiting for ENIs to be deleted."
 exit 1
-
